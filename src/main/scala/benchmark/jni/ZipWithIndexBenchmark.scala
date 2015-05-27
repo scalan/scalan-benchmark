@@ -20,11 +20,11 @@ object ZipWithIndexBenchmark {
   trait CommonData {
     val rnd = new Random(1)
 
-    val arr10000 = { for (i <- 1 to 10000) yield { rnd.nextDouble() } }.toArray
-    val arr3000 = { for (i <- 1 to 3000) yield { rnd.nextDouble() } }.toArray
-    val arr100 = { for (i <- 1 to 100) yield { rnd.nextDouble() } }.toArray
+    var arr: Array[Double] = Array.empty
 
-    val arr = arr10000
+    def genArray(len: Int): Array[Double] = {
+      { for (i <- 1 to len) yield { rnd.nextDouble() } }.toArray
+    }
   }
 
   trait ScalaState extends CommonData {
@@ -57,13 +57,30 @@ object ZipWithIndexBenchmark {
 
   @State(Scope.Benchmark)
   class CommonState extends CommonData {
-    var res: Array[(Int, Double)] = Array.empty;
 
-    val correct_res = (0 to arr.length).zip(arr)
+    @Param(Array("false"))
+    var doCheck: Boolean = false;
+
+    @Param(Array("1000", "3000", "10000"))
+    var len: Int = 0
+
+    var res: Array[(Int, Double)] = Array.empty
+    var correct_res: Array[(Int, Double)] = Array.empty
+
+    @Setup
+    def prepare(): Unit = {
+      arr = genArray(len)
+      correct_res = { (0 until arr.length).zip(arr) }.toArray
+    }
 
     @TearDown
     def check(): Unit = {
-      assert(res.sameElements(correct_res))
+      if (doCheck) {
+        println(s"${arr.mkString(",")}")
+        println(s"${res.mkString(",")}")
+        println(s"${correct_res.mkString(",")}")
+        assert(res.sameElements(correct_res))
+      }
     }
   }
 
@@ -114,7 +131,7 @@ object ZipWithIndexBenchmark {
 @Warmup(iterations = 10)
 @Measurement(iterations = 10)
 class ZipWithIndexBenchmark {
-  System.loadLibrary("JNIEffects")
+  System.loadLibrary("jniZipWithIndex")
 
   import benchmark.jni.ZipWithIndexBenchmark._
 
