@@ -21,4 +21,9 @@ class NativeMethods {
   @native def sdmvmManualNoSharedPtr(p: (Array[(Array[Int], (Array[Double], Int))], Array[Double])): Array[Double]
 
   @native def sdmvmScalanJNI(p: (Array[(Array[Int], (Array[Double], Int))], Array[Double])): Array[Double]
+
+  @native def jniZipArrayWithIndex(arr: Array[Double]): Array[(Int, Double)]
+  @native def jniZipCollectionWithIndex(arr: Array[Double]): Array[(Int, Double)]
+  @native def jniZipCollectionWithIndex2(arr: Array[Double]): Array[(Int, Double)]
+  @native def jniZipCollectionWithIndex3(arr: Array[Double]): Array[(Int, Double)]
 }
