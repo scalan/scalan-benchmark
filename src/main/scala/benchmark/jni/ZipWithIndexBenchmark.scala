@@ -1,13 +1,15 @@
 package benchmark.jni
 
 import java.io.File
+import java.lang.reflect.Method
 import java.util.concurrent.TimeUnit
 
 import org.openjdk.jmh.annotations._
 
 import scala.util.Random
 import scalan.ScalanCommunityDslExp
-import scalan.compilation.lms.{ CommunityLmsBackend, CoreBridge }
+import scalan.compilation.lms.uni.LmsCompilerUni
+import scalan.compilation.lms.{ LmsCompiler, CommunityLmsBackend, CoreBridge }
 import scalan.compilation.lms.scalac.CommunityLmsCompilerScala
 import scalan.monads.MonadsDslExp
 import scalan.primitives.EffectfulCompiler
@@ -27,17 +29,16 @@ object ZipWithIndexBenchmark {
     }
   }
 
-  trait ScalaState extends CommonData {
+  trait StateBase extends CommonData {
+    def baseDir: File
 
-    class ProgExp extends StateExamples with CommunityLmsCompilerScala with CoreBridge
-        with ScalanCommunityDslExp with EffectfulCompiler with MonadsDslExp {
+    trait ProgExp extends LmsCompiler with StateExamples with CoreBridge with ScalanCommunityDslExp
+        with EffectfulCompiler with MonadsDslExp {
       val State = new State0Manager[Int]
       val lms = new CommunityLmsBackend
-    }
 
-    val ctx = new ProgExp
-    val baseDir = FileUtil.file("ZipWithIndex")
-    protected implicit val cfg = ctx.defaultCompilerConfig.copy(scalaVersion = Some("2.11.2"))
+      def loadMethod(compilerOutput: CompilerOutput[_, _]): (Class[_], Method)
+    }
 
     protected def loadMethod[A, B](prog: ProgExp)(baseDir: File, functionName: String, f: prog.Exp[A => B])(implicit compilerConfig: prog.CompilerConfig) =
       {
@@ -48,11 +49,18 @@ object ZipWithIndexBenchmark {
         val instance = cls.newInstance()
         (method.invoke(instance, _: AnyRef)).asInstanceOf[A => B]
       }
-
   }
 
-  trait CxxState extends CommonData {
-    val nm = new NativeMethods
+  trait ScalaState extends StateBase {
+    val ctx = new ProgExp with CommunityLmsCompilerScala
+    val baseDir = FileUtil.file("staged-scala", "ZipWithIndex")
+    implicit val cfg = ctx.defaultCompilerConfig.copy(scalaVersion = Some("2.11.2"))
+  }
+
+  trait UniState extends StateBase {
+    val ctx = new ProgExp with LmsCompilerUni
+    val baseDir = FileUtil.file("staged-uni", "ZipWithIndex")
+    implicit val cfg = ctx.defaultCompilerConfig.copy(scalaVersion = Some("2.11.2"))
   }
 
   @State(Scope.Benchmark)
@@ -90,8 +98,8 @@ object ZipWithIndexBenchmark {
   }
 
   @State(Scope.Benchmark)
-  class StateCxxZipArrayWithIndex extends CommonState with CxxState {
-    val fu = nm.jniZipArrayWithIndex(_)
+  class StateUniZipArrayWithIndex extends CommonState with UniState {
+    val fu = loadMethod(ctx)(baseDir, "zipWithArrayIndex", ctx.zipArrayWithIndexW)
   }
 
   @State(Scope.Benchmark)
@@ -100,8 +108,8 @@ object ZipWithIndexBenchmark {
   }
 
   @State(Scope.Benchmark)
-  class StateCxxZipCollectionWithIndex extends CommonState with CxxState {
-    val fu = nm.jniZipCollectionWithIndex(_)
+  class StateUniZipCollectionWithIndex extends CommonState with UniState {
+    val fu = loadMethod(ctx)(baseDir, "zipCollectionArrayIndex", ctx.zipCollectionWithIndexW)
   }
 
   @State(Scope.Benchmark)
@@ -110,8 +118,8 @@ object ZipWithIndexBenchmark {
   }
 
   @State(Scope.Benchmark)
-  class StateCxxZipCollectionWithIndex2 extends CommonState with CxxState {
-    val fu = nm.jniZipCollectionWithIndex2(_)
+  class StateUniZipCollectionWithIndex2 extends CommonState with UniState {
+    val fu = loadMethod(ctx)(baseDir, "zipCollectionArrayIndex2", ctx.zipCollectionWithIndexW2)
   }
 
   @State(Scope.Benchmark)
@@ -120,8 +128,8 @@ object ZipWithIndexBenchmark {
   }
 
   @State(Scope.Benchmark)
-  class StateCxxZipCollectionWithIndex3 extends CommonState with CxxState {
-    val fu = nm.jniZipCollectionWithIndex3(_)
+  class StateUniZipCollectionWithIndex3 extends CommonState with UniState {
+    val fu = loadMethod(ctx)(baseDir, "zipCollectionArrayIndex3", ctx.zipCollectionWithIndexW3)
   }
 }
 
@@ -131,55 +139,63 @@ object ZipWithIndexBenchmark {
 @Warmup(iterations = 10)
 @Measurement(iterations = 10)
 class ZipWithIndexBenchmark {
-  System.loadLibrary("jniZipWithIndex")
+  //  System.loadLibrary("jniZipWithIndex")
 
   import benchmark.jni.ZipWithIndexBenchmark._
 
   @Benchmark
   def zipArrayWithIndex_scala(c: StateScalaZipArrayWithIndex): Array[(Int, Double)] = {
-    c.res = c.fu(c.arr)
-    c.res
+    val res = c.fu(c.arr)
+    c.res = res
+    res
   }
 
   @Benchmark
-  def zipArrayWithIndex_cxx(c: StateCxxZipArrayWithIndex): Array[(Int, Double)] = {
-    c.res = c.fu(c.arr)
-    c.res
+  def zipArrayWithIndex_uni(c: StateUniZipArrayWithIndex): Array[(Int, Double)] = {
+    val res = c.fu(c.arr)
+    c.res = res
+    res
   }
 
   @Benchmark
   def zipCollectionWithIndex_scala(c: StateScalaZipCollectionWithIndex): Array[(Int, Double)] = {
-    c.res = c.fu(c.arr)
-    c.res
+    val res = c.fu(c.arr)
+    c.res = res
+    res
   }
 
   @Benchmark
-  def zipCollectionWithIndex_cxx(c: StateCxxZipCollectionWithIndex): Array[(Int, Double)] = {
-    c.res = c.fu(c.arr)
-    c.res
+  def zipCollectionWithIndex_uni(c: StateUniZipCollectionWithIndex): Array[(Int, Double)] = {
+    val res = c.fu(c.arr)
+    c.res = res
+    res
   }
 
   @Benchmark
   def zipCollectionWithIndex2_scala(c: StateScalaZipCollectionWithIndex2): Array[(Int, Double)] = {
-    c.res = c.fu(c.arr)
-    c.res
+    val res = c.fu(c.arr)
+    c.res = res
+    res
   }
 
   @Benchmark
-  def zipCollectionWithIndex2_cxx(c: StateCxxZipCollectionWithIndex2): Array[(Int, Double)] = {
-    c.res = c.fu(c.arr)
-    c.res
+  def zipCollectionWithIndex2_uni(c: StateUniZipCollectionWithIndex2): Array[(Int, Double)] = {
+    val res = c.fu(c.arr)
+    c.res = res
+    res
   }
 
   @Benchmark
   def zipCollectionWithIndex3_scala(c: StateScalaZipCollectionWithIndex3): Array[(Int, Double)] = {
-    c.res = c.fu(c.arr)
-    c.res
+    val res = c.fu(c.arr)
+    c.res = res
+    res
   }
 
   @Benchmark
-  def zipCollectionWithIndex3_cxx(c: StateCxxZipCollectionWithIndex3): Array[(Int, Double)] = {
-    c.res = c.fu(c.arr)
-    c.res
+  def zipCollectionWithIndex3_uni(c: StateUniZipCollectionWithIndex3): Array[(Int, Double)] = {
+    val res = c.fu(c.arr)
+    c.res = res
+    res
   }
 }
